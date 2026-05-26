@@ -92,6 +92,32 @@ def _apply_search_engine_prefs(
     logger.debug("Applied search_engine=%r to %s", search_engine, prefs_file)
 
 
+def _open_start_page(context: Any, start_page: str | None) -> None:
+    """Open start_page in the first context page, warning instead of failing launch."""
+    if not start_page:
+        return
+    try:
+        pages = getattr(context, "pages", [])
+        page_list = pages if isinstance(pages, list) else []
+        page = page_list[0] if page_list else context.new_page()
+        page.goto(start_page)
+    except Exception as exc:
+        logger.warning("Failed to open start_page=%r: %s", start_page, exc)
+
+
+async def _open_start_page_async(context: Any, start_page: str | None) -> None:
+    """Async variant of _open_start_page()."""
+    if not start_page:
+        return
+    try:
+        pages = getattr(context, "pages", [])
+        page_list = pages if isinstance(pages, list) else []
+        page = page_list[0] if page_list else await context.new_page()
+        await page.goto(start_page)
+    except Exception as exc:
+        logger.warning("Failed to open start_page=%r: %s", start_page, exc)
+
+
 def _resolve_timezone(timezone: str | None, kwargs: dict[str, Any]) -> str | None:
     """Accept both timezone and timezone_id — either works, no warning."""
     if "timezone_id" in kwargs:
@@ -316,6 +342,7 @@ def launch_persistent_context(
     timezone: str | None = None,
     color_scheme: Literal["light", "dark", "no-preference"] | None = None,
     search_engine: Literal["google", "bing", "duckduckgo"] | None = None,
+    start_page: str | None = None,
     geoip: bool = False,
     backend: str | None = None,
     humanize: bool = False,
@@ -347,6 +374,7 @@ def launch_persistent_context(
         color_scheme: Color scheme preference — 'light', 'dark', or 'no-preference'.
             Default: None (uses Chromium default, which is 'light').
         search_engine: Default search engine — 'google', 'bing', or 'duckduckgo'.
+        start_page: URL to open after context creation.
         geoip: Auto-detect timezone/locale from proxy IP (default False).
             Requires ``pip install cloakbrowser[geoip]``.
         backend: Playwright backend — 'playwright' (default) or 'patchright'.
@@ -400,6 +428,7 @@ def launch_persistent_context(
         context_kwargs["color_scheme"] = color_scheme
     if search_engine:
         _apply_search_engine_prefs(user_data_dir, search_engine)
+
     context_kwargs.update(kwargs)
 
     pw = sync_playwright().start()
@@ -431,6 +460,8 @@ def launch_persistent_context(
         cfg = resolve_config(human_preset, human_config)
         patch_context(context, cfg)
 
+    _open_start_page(context, start_page)
+
     return context
 
 
@@ -446,6 +477,7 @@ async def launch_persistent_context_async(
     timezone: str | None = None,
     color_scheme: Literal["light", "dark", "no-preference"] | None = None,
     search_engine: Literal["google", "bing", "duckduckgo"] | None = None,
+    start_page: str | None = None,
     geoip: bool = False,
     backend: str | None = None,
     humanize: bool = False,
@@ -475,6 +507,7 @@ async def launch_persistent_context_async(
         timezone: IANA timezone (e.g. 'America/New_York').
         color_scheme: Color scheme preference — 'light', 'dark', or 'no-preference'.
         search_engine: Default search engine — 'google', 'bing', or 'duckduckgo'.
+        start_page: URL to open after context creation.
         geoip: Auto-detect timezone/locale from proxy IP (default False).
         backend: Playwright backend — 'playwright' (default) or 'patchright'.
         humanize: Enable human-like mouse, keyboard, scroll behavior (default False).
@@ -563,6 +596,8 @@ async def launch_persistent_context_async(
         cfg = resolve_config(human_preset, human_config)
         patch_context_async(context, cfg)
 
+    await _open_start_page_async(context, start_page)
+
     return context
 
 
@@ -577,6 +612,7 @@ def launch_context(
     timezone: str | None = None,
     color_scheme: Literal["light", "dark", "no-preference"] | None = None,
     search_engine: Literal["google", "bing", "duckduckgo"] | None = None,
+    start_page: str | None = None,
     geoip: bool = False,
     backend: str | None = None,
     humanize: bool = False,
@@ -604,6 +640,7 @@ def launch_context(
         color_scheme: Color scheme preference — 'light', 'dark', or 'no-preference'.
             Default: None (uses Chromium default, which is 'light').
         search_engine: Default search engine — 'google', 'bing', or 'duckduckgo'.
+        start_page: URL to open after context creation.
         geoip: Auto-detect timezone/locale from proxy IP (default False).
         backend: Playwright backend — 'playwright' (default) or 'patchright'.
         humanize: Enable human-like mouse, keyboard, scroll behavior (default False).
@@ -674,6 +711,8 @@ def launch_context(
         cfg = resolve_config(human_preset, human_config)
         patch_context(context, cfg)
 
+    _open_start_page(context, start_page)
+
     return context
 
 
@@ -688,6 +727,7 @@ async def launch_context_async(
     timezone: str | None = None,
     color_scheme: Literal["light", "dark", "no-preference"] | None = None,
     search_engine: Literal["google", "bing", "duckduckgo"] | None = None,
+    start_page: str | None = None,
     geoip: bool = False,
     backend: str | None = None,
     humanize: bool = False,
@@ -716,6 +756,7 @@ async def launch_context_async(
         timezone: IANA timezone (e.g. 'America/New_York').
         color_scheme: Color scheme preference — 'light', 'dark', or 'no-preference'.
         search_engine: Default search engine — 'google', 'bing', or 'duckduckgo'.
+        start_page: URL to open after context creation.
         geoip: Auto-detect timezone/locale from proxy IP (default False).
         backend: Playwright backend — 'playwright' (default) or 'patchright'.
         humanize: Enable human-like mouse, keyboard, scroll behavior (default False).
@@ -809,6 +850,8 @@ async def launch_context_async(
         from .human.config import resolve_config
         cfg = resolve_config(human_preset, human_config)
         patch_context_async(context, cfg)
+
+    await _open_start_page_async(context, start_page)
 
     return context
 

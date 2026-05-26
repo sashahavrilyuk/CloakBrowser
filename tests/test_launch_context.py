@@ -15,6 +15,7 @@ def _make_mock_browser():
     """Create a mock browser with new_context() returning a mock context."""
     browser = MagicMock()
     context = MagicMock()
+    context.pages = []
     browser.new_context.return_value = context
     return browser, context
 
@@ -112,6 +113,22 @@ def test_color_scheme(mock_launch, _mock_bin):
 
     ctx_kwargs = browser.new_context.call_args
     assert ctx_kwargs[1]["color_scheme"] == "dark"
+
+
+@patch("cloakbrowser.browser.ensure_binary", return_value="/fake/chrome")
+@patch("cloakbrowser.browser.launch")
+def test_start_page_opens_new_page(mock_launch, _mock_bin):
+    """start_page opens and navigates a page after context creation."""
+    browser, context = _make_mock_browser()
+    page = MagicMock()
+    context.new_page.return_value = page
+    mock_launch.return_value = browser
+
+    from cloakbrowser.browser import launch_context
+    launch_context(start_page="https://example.com")
+
+    context.new_page.assert_called_once()
+    page.goto.assert_called_once_with("https://example.com")
 
 
 @patch("cloakbrowser.browser.maybe_resolve_geoip", return_value=("Europe/Berlin", "de-DE", "5.6.7.8"))
@@ -218,6 +235,7 @@ def _make_mock_async_browser():
     """Create a mock async browser whose new_context() returns a mock context."""
     browser = AsyncMock()
     context = AsyncMock()
+    context.pages = []
     browser.new_context.return_value = context
     return browser, context
 
@@ -253,6 +271,23 @@ async def test_async_default_viewport(mock_launch_async, _mock_bin):
 
     ctx_kwargs = browser.new_context.call_args
     assert ctx_kwargs[1]["viewport"] == DEFAULT_VIEWPORT
+
+
+@pytest.mark.asyncio
+@patch("cloakbrowser.browser.ensure_binary", return_value="/fake/chrome")
+@patch("cloakbrowser.browser.launch_async")
+async def test_async_start_page_reuses_existing_page(mock_launch_async, _mock_bin):
+    """Async start_page navigates an existing context page when present."""
+    browser, context = _make_mock_async_browser()
+    page = AsyncMock()
+    context.pages = [page]
+    mock_launch_async.return_value = browser
+
+    from cloakbrowser.browser import launch_context_async
+    await launch_context_async(start_page="https://example.com")
+
+    context.new_page.assert_not_called()
+    page.goto.assert_called_once_with("https://example.com")
 
 
 @pytest.mark.asyncio

@@ -14,6 +14,7 @@ from cloakbrowser.config import DEFAULT_VIEWPORT
 def _make_mock_pw_and_context():
     """Create mock sync_playwright chain returning a mock context."""
     context = MagicMock()
+    context.pages = []
     pw = MagicMock()
     pw.chromium.launch_persistent_context.return_value = context
     pw_cm = MagicMock()
@@ -139,6 +140,22 @@ def test_persistent_context_search_engine_writes_chromium_prefs(_mock_geoip, _mo
     assert "suggest_url" not in data
 
 
+@patch("cloakbrowser.browser.ensure_binary", return_value="/fake/chrome")
+@patch("cloakbrowser.browser.maybe_resolve_geoip", return_value=(None, None, None))
+def test_persistent_context_start_page_reuses_existing_page(_mock_geoip, _mock_bin):
+    """start_page navigates Chromium's existing persistent-context page."""
+    pw_cm, pw, context = _make_mock_pw_and_context()
+    page = MagicMock()
+    context.pages = [page]
+
+    with patch("playwright.sync_api.sync_playwright", return_value=pw_cm):
+        from cloakbrowser.browser import launch_persistent_context
+        launch_persistent_context("/tmp/profile", start_page="https://example.com")
+
+    context.new_page.assert_not_called()
+    page.goto.assert_called_once_with("https://example.com")
+
+
 @patch("cloakbrowser.browser.maybe_resolve_geoip", return_value=("Europe/Berlin", "de-DE", "5.6.7.8"))
 @patch("cloakbrowser.browser.ensure_binary", return_value="/fake/chrome")
 def test_persistent_context_geoip(_mock_bin, _mock_geoip):
@@ -228,6 +245,7 @@ def test_persistent_context_proxy_dict(_mock_geoip, _mock_bin):
 def _make_mock_async_pw_and_context():
     """Create mock async_playwright chain returning a mock context."""
     context = AsyncMock()
+    context.pages = []
     pw = AsyncMock()
     pw.chromium.launch_persistent_context.return_value = context
     pw_cm = AsyncMock()
@@ -266,6 +284,23 @@ async def test_persistent_context_async_close_stops_pw(_mock_geoip, _mock_bin):
     await ctx.close()
     original_close.assert_called_once()
     pw.stop.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch("cloakbrowser.browser.ensure_binary", return_value="/fake/chrome")
+@patch("cloakbrowser.browser.maybe_resolve_geoip", return_value=(None, None, None))
+async def test_persistent_context_async_start_page_opens_new_page(_mock_geoip, _mock_bin):
+    """Async start_page opens a page when Chromium did not create one."""
+    pw_cm, pw, context = _make_mock_async_pw_and_context()
+    page = AsyncMock()
+    context.new_page.return_value = page
+
+    with patch("playwright.async_api.async_playwright", return_value=pw_cm):
+        from cloakbrowser.browser import launch_persistent_context_async
+        await launch_persistent_context_async("/tmp/profile", start_page="https://example.com")
+
+    context.new_page.assert_called_once()
+    page.goto.assert_called_once_with("https://example.com")
 
 
 @pytest.mark.asyncio
